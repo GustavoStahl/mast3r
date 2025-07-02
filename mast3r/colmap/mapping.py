@@ -157,7 +157,8 @@ def glomap_run_mapper(glomap_bin, colmap_db_path, recon_path, image_root_path):
             f' {glomap_process.returncode} )')
 
 
-def kapture_import_image_folder_or_list(images_path: Union[str, Tuple[str, List[str]]], use_single_camera=False) -> kapture.Kapture:
+def kapture_import_image_folder_or_list(images_path: Union[str, Tuple[str, List[str]]], use_single_camera=False,
+                                        camera_type : kapture.CameraType = kapture.CameraType.UNKNOWN_CAMERA) -> kapture.Kapture:
     images = kapture.RecordsCamera()
 
     if isinstance(images_path, str):
@@ -184,12 +185,12 @@ def kapture_import_image_folder_or_list(images_path: Union[str, Tuple[str, List[
 
         camera_id = f'sensor'
         if use_single_camera and camera_id not in sensors:
-            sensors[camera_id] = kapture.Camera(kapture.CameraType.UNKNOWN_CAMERA, model_params)
+            sensors[camera_id] = kapture.Camera(camera_type, model_params)
         elif use_single_camera:
             assert sensors[camera_id].camera_params[0] == width and sensors[camera_id].camera_params[1] == height
         else:
             camera_id = camera_id + f'{n}'
-            sensors[camera_id] = kapture.Camera(kapture.CameraType.UNKNOWN_CAMERA, model_params)
+            sensors[camera_id] = kapture.Camera(camera_type, model_params)
 
         images[(n, camera_id)] = path_secure(filename)  # don't forget windows
 
