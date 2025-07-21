@@ -30,9 +30,9 @@ if __name__ == '__main__':
     filelist = filelist[0 : args.first_n : args.downsample_rate]
 
     # options: "complete", "swin", "logwin", "oneref"
-    scenegraph_type = "complete"
+    scenegraph_type = "swin"
     winsize = 1
-    win_cyclic = True
+    win_cyclic = False
     refid = 0
     shared_intrinsics = True
 
