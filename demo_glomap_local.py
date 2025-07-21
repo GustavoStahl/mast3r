@@ -36,7 +36,13 @@ if __name__ == '__main__':
     refid = 0
     shared_intrinsics = True
 
+    from kapture import CameraType
+    camera_model = CameraType[args.camera_model]
+    camera_params = args.camera_params
+
     cache_path = args.tmp_dir
     os.makedirs(cache_path, exist_ok=True)
     reconstruct_scene(args.glomap_bin, cache_path, model, args.retrieval_model, args.device, args.image_size,
-                      filelist, scenegraph_type, winsize, win_cyclic, refid, shared_intrinsics)
+                      filelist, scenegraph_type, winsize, win_cyclic, refid, shared_intrinsics, 
+                      camera_model, camera_params, False
+                      )

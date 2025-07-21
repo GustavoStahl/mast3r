@@ -136,7 +136,7 @@ def pycolmap_run_mapper(colmap_db_path, recon_path, image_root_path):
     )
 
 
-def glomap_run_mapper(glomap_bin, colmap_db_path, recon_path, image_root_path):
+def glomap_run_mapper(glomap_bin, colmap_db_path, recon_path, image_root_path, optimize_intrinsics=True):
     print("running mapping")
     args = [
         'mapper',
@@ -145,7 +145,9 @@ def glomap_run_mapper(glomap_bin, colmap_db_path, recon_path, image_root_path):
         '--image_path',
         image_root_path,
         '--output_path',
-        recon_path
+        recon_path,
+        '--BundleAdjustment.optimize_intrinsics',
+        str(int(optimize_intrinsics))
     ]
     args.insert(0, glomap_bin)
     glomap_process = subprocess.Popen(args)
@@ -158,7 +160,8 @@ def glomap_run_mapper(glomap_bin, colmap_db_path, recon_path, image_root_path):
 
 
 def kapture_import_image_folder_or_list(images_path: Union[str, Tuple[str, List[str]]], use_single_camera=False,
-                                        camera_type : kapture.CameraType = kapture.CameraType.UNKNOWN_CAMERA) -> kapture.Kapture:
+                                        camera_model : kapture.CameraType = kapture.CameraType.UNKNOWN_CAMERA,
+                                        camera_params : List[float] = []) -> kapture.Kapture:
     images = kapture.RecordsCamera()
 
     if isinstance(images_path, str):
@@ -177,7 +180,8 @@ def kapture_import_image_folder_or_list(images_path: Union[str, Tuple[str, List[
             # lazy load
             with PIL.Image.open(path.join(images_root, filename)) as im:
                 width, height = im.size
-                model_params = [width, height]
+                if len(camera_params) == 0:
+                    camera_params = [width, height]
         except (OSError, PIL.UnidentifiedImageError):
             # It is not a valid image: skip it
             print(f'Skipping invalid image file {filename}')
@@ -185,12 +189,12 @@ def kapture_import_image_folder_or_list(images_path: Union[str, Tuple[str, List[
 
         camera_id = f'sensor'
         if use_single_camera and camera_id not in sensors:
-            sensors[camera_id] = kapture.Camera(camera_type, model_params)
+            sensors[camera_id] = kapture.Camera(camera_model, camera_params)
         elif use_single_camera:
             assert sensors[camera_id].camera_params[0] == width and sensors[camera_id].camera_params[1] == height
         else:
             camera_id = camera_id + f'{n}'
-            sensors[camera_id] = kapture.Camera(camera_type, model_params)
+            sensors[camera_id] = kapture.Camera(camera_model, camera_params)
 
         images[(n, camera_id)] = path_secure(filename)  # don't forget windows
 

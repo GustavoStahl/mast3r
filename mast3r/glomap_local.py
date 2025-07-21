@@ -24,16 +24,23 @@ from dust3r.demo import get_args_parser as dust3r_get_args_parser
 
 # Type hints
 from mast3r.model import AsymmetricMASt3R
-from typing import Union
+from typing import Union, List
 from kapture import CameraType
 
 def get_args_parser():
+    # Inserting a method to print the available options in the Enum without changing directly in the library
+    def camera_type_options(cls):
+        return [member.name for member in cls]
+    CameraType.options = classmethod(camera_type_options)
+
     parser = dust3r_get_args_parser()
     parser.add_argument('--glomap_bin', default='glomap', type=str, help='glomap bin')
     parser.add_argument('--input_dir', type=str, help='path to the input directory containing the images to be processed')
     parser.add_argument('--first_n', type=int, default=-1, help='load the first N images contained in the input dir')
     parser.add_argument('--downsample_rate', type=int, default=1, help='drop files at the given rate')
     parser.add_argument('--retrieval_model', default=None, type=str, help="retrieval_model to be loaded")
+    parser.add_argument('--camera_model', default=CameraType.UNKNOWN_CAMERA.name, type=str, choices=CameraType.options(), help="Model of the camera used to capture the images")
+    parser.add_argument('--camera_params', nargs="*", default=[], type=float, help="Parameters of the camera model. If the camera model is unknown then this argument can be ommited")
 
     actions = parser._actions
     for action in actions:
@@ -55,7 +62,9 @@ def reconstruct_scene(glomap_bin : str,
                       win_cyclic: bool, 
                       refid: int, 
                       shared_intrinsics: bool, 
-                      camera_type : CameraType = CameraType.UNKNOWN_CAMERA):
+                      camera_model : CameraType = CameraType.UNKNOWN_CAMERA,
+                      camera_params : List[float] = [],
+                      glomap_only : bool = False):
     """
     from a list of images, run mast3r inference, sparse global aligner.
     then run get_3D_model_from_scene
@@ -99,47 +108,48 @@ def reconstruct_scene(glomap_bin : str,
         os.path.relpath(filename, root_path).replace('\\', '/')
         for filename in filelist
     ]
-    kdata = kapture_import_image_folder_or_list((root_path, filelist_relpath), shared_intrinsics, camera_type)
+    kdata = kapture_import_image_folder_or_list((root_path, filelist_relpath), shared_intrinsics, camera_model, camera_params)
     image_pairs = [
         (filelist_relpath[img1['idx']], filelist_relpath[img2['idx']])
         for img1, img2 in pairs
     ]
 
     colmap_db_path = os.path.join(cache_dir, 'colmap.db')
-    if os.path.isfile(colmap_db_path):
-        os.remove(colmap_db_path)
+    if not glomap_only:
+        if os.path.isfile(colmap_db_path):
+            os.remove(colmap_db_path)
 
-    os.makedirs(os.path.dirname(colmap_db_path), exist_ok=True)
-    colmap_db = COLMAPDatabase.connect(colmap_db_path)
-    try:
-        kapture_to_colmap(kdata, root_path, tar_handler=None, database=colmap_db,
-                          keypoints_type=None, descriptors_type=None, export_two_view_geometry=False)
-        colmap_image_pairs = run_mast3r_matching(model, image_size, 16, device,
-                                                 kdata, root_path, image_pairs, colmap_db,
-                                                 False, 5, 1.001,
-                                                 False, 3)
-        colmap_db.close()
-    except Exception as e:
-        print(f'Error {e}')
-        colmap_db.close()
-        exit(1)
+        os.makedirs(os.path.dirname(colmap_db_path), exist_ok=True)
+        colmap_db = COLMAPDatabase.connect(colmap_db_path)
+        try:
+            kapture_to_colmap(kdata, root_path, tar_handler=None, database=colmap_db,
+                            keypoints_type=None, descriptors_type=None, export_two_view_geometry=False)
+            colmap_image_pairs = run_mast3r_matching(model, image_size, 16, device,
+                                                    kdata, root_path, image_pairs, colmap_db,
+                                                    False, 5, 1.001,
+                                                    False, 3)
+            colmap_db.close()
+        except Exception as e:
+            print(f'Error {e}')
+            colmap_db.close()
+            exit(1)
 
-    if len(colmap_image_pairs) == 0:
-        raise Exception("no matches were kept")
+        if len(colmap_image_pairs) == 0:
+            raise Exception("no matches were kept")
 
-    # colmap db is now full, run colmap
-    print("verify_matches")
-    f = open(cache_dir + '/pairs.txt', "w")
-    for image_path1, image_path2 in colmap_image_pairs:
-        f.write("{} {}\n".format(image_path1, image_path2))
-    f.close()
-    pycolmap.verify_matches(colmap_db_path, cache_dir + '/pairs.txt')
+        # colmap db is now full, run colmap
+        print("verify_matches")
+        f = open(cache_dir + '/pairs.txt', "w")
+        for image_path1, image_path2 in colmap_image_pairs:
+            f.write("{} {}\n".format(image_path1, image_path2))
+        f.close()
+        pycolmap.verify_matches(colmap_db_path, cache_dir + '/pairs.txt')
 
     reconstruction_path = os.path.join(cache_dir, "reconstruction")
     if os.path.isdir(reconstruction_path):
         shutil.rmtree(reconstruction_path)
     os.makedirs(reconstruction_path, exist_ok=True)
-    glomap_run_mapper(glomap_bin, colmap_db_path, reconstruction_path, root_path)
+    glomap_run_mapper(glomap_bin, colmap_db_path, reconstruction_path, root_path, optimize_intrinsics=(camera_model == CameraType.UNKNOWN_CAMERA))
 
     outfile_name = os.path.join(outdir, "scene.ply")
 
