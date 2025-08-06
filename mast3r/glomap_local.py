@@ -41,6 +41,7 @@ def get_args_parser():
     parser.add_argument('--retrieval_model', default=None, type=str, help="retrieval_model to be loaded")
     parser.add_argument('--camera_model', default=CameraType.UNKNOWN_CAMERA.name, type=str, choices=CameraType.options(), help="Model of the camera used to capture the images")
     parser.add_argument('--camera_params', nargs="*", default=[], type=float, help="Parameters of the camera model. If the camera model is unknown then this argument can be ommited")
+    parser.add_argument('--glomap_only', action="store_true", help="In case you want to skip mast3r and go straight to glomap. Mast3r must have run before")
 
     actions = parser._actions
     for action in actions:

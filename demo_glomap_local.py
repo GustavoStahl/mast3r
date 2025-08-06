@@ -44,5 +44,4 @@ if __name__ == '__main__':
     os.makedirs(cache_path, exist_ok=True)
     reconstruct_scene(args.glomap_bin, cache_path, model, args.retrieval_model, args.device, args.image_size,
                       filelist, scenegraph_type, winsize, win_cyclic, refid, shared_intrinsics, 
-                      camera_model, camera_params, False
-                      )
+                      camera_model, camera_params, args.glomap_only)
